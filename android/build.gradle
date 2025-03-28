@@ -20,6 +20,7 @@ rootProject.allprojects {
 }
 
 apply plugin: 'com.android.library'
+apply plugin: 'org.jetbrains.kotlin.android'
 
 android {
     compileSdkVersion 34
@@ -34,9 +35,14 @@ android {
     defaultConfig {
         minSdkVersion 16
     }
+    kotlinOptions {
+        jvmTarget = '1.8'
+    }
 }
 
 dependencies {
     implementation 'com.google.code.gson:gson:2.8.6'
+    implementation 'androidx.core:core-ktx:1.15.0'
+    implementation 'androidx.compose.ui:ui-test-android:1.7.8'
 }
 

@@ -46,10 +46,19 @@ public class AccessibilityListener extends AccessibilityService {
     public static AccessibilityNodeInfo getNodeInfo(String id) {
         return nodeMap.get(id);
     }
+    private static final long UPDATE_INTERVAL = 500; // miliseconds
+    private long lastUpdateTime = 0;
+    private boolean handlingEvent = false;
 
     @RequiresApi(api = Build.VERSION_CODES.N)
     @Override
     public void onAccessibilityEvent(AccessibilityEvent accessibilityEvent) {
+        long currentTime = System.currentTimeMillis();
+        if (handlingEvent || currentTime - lastUpdateTime < UPDATE_INTERVAL) {
+            return;
+        }
+        lastUpdateTime = currentTime;
+
         try {
             final int eventType = accessibilityEvent.getEventType();
             AccessibilityNodeInfo parentNodeInfo = accessibilityEvent.getSource();
@@ -90,7 +99,8 @@ public class AccessibilityListener extends AccessibilityService {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR2) {
                 data.put("nodeId", parentNodeInfo.getViewIdResourceName());
             }
-            getSubNodes(parentNodeInfo, subNodeActions, traversedNodes);
+            StringBuilder stringBuilder = new StringBuilder();
+            getSubNodes(parentNodeInfo, subNodeActions, traversedNodes, stringBuilder);
             data.put("nodesText", nextTexts);
             actions.addAll(parentNodeInfo.getActionList().stream().map(AccessibilityNodeInfo.AccessibilityAction::getId).collect(Collectors.toList()));
             data.put("parentActions", actions);
@@ -109,11 +119,16 @@ public class AccessibilityListener extends AccessibilityService {
                     data.put("isPip", windowInfo.isInPictureInPictureMode());
                 }
             }
-            storeToSharedPrefs(data);
+            data.put("screenText", stringBuilder.toString());
+
+            storeToContentProvider(data);
             intent.putExtra(SEND_BROADCAST, true);
             sendBroadcast(intent);
         } catch (Exception ex) {
             Log.e("EVENT", "onAccessibilityEvent: " + ex.getMessage());
+        }
+        finally {
+            handlingEvent = false;
         }
     }
 
@@ -138,7 +153,12 @@ public class AccessibilityListener extends AccessibilityService {
 
     @RequiresApi(api = Build.VERSION_CODES.N)
     @TargetApi(Build.VERSION_CODES.LOLLIPOP)
-    void getSubNodes(AccessibilityNodeInfo node, List<HashMap<String, Object>> arr, HashSet<AccessibilityNodeInfo> traversedNodes) {
+    void getSubNodes(
+            AccessibilityNodeInfo node,
+            List<HashMap<String, Object>> arr,
+            HashSet<AccessibilityNodeInfo> traversedNodes,
+            StringBuilder stringBuilder
+    ) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR2) {
             if (traversedNodes.contains(node)) return;
             traversedNodes.add(node);
@@ -166,11 +186,14 @@ public class AccessibilityListener extends AccessibilityService {
             }
             arr.add(nested);
             storeNode(mapId, node);
+            if (node.getText() != null && !node.getText().toString().isEmpty()){
+                stringBuilder.append(node.getText().toString()).append("\n");
+            }
             for (int i = 0; i < node.getChildCount(); i++) {
                 AccessibilityNodeInfo child = node.getChild(i);
                 if (child == null)
                     continue;
-                getSubNodes(child, arr, traversedNodes);
+                getSubNodes(child, arr, traversedNodes, stringBuilder);
             }
         }
     }
@@ -253,6 +276,15 @@ public class AccessibilityListener extends AccessibilityService {
         String json = gson.toJson(data);
         editor.putString(ACCESSIBILITY_NODE, json);
         editor.apply();
+    }
+
+    void storeToContentProvider(HashMap<String, Object> data) {
+        Gson gson = new Gson();
+        String json = gson.toJson(data);
+        getContentResolver().insert(
+                AccessibilityEventContentProvider.CONTENT_URI,
+                AccessibilityEventContentProvider.createProviderValue(json)
+        );
     }
 
 }

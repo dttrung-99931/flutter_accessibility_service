@@ -30,6 +30,9 @@ class AccessibilityEvent {
   /// https://developer.android.com/reference/android/view/accessibility/AccessibilityNodeInfo#getText()
   String? text;
 
+  /// All texts on screen. Only root node has this.
+  String? screenText;
+
   /// the bit mask of change types signaled by a `TYPE_WINDOW_CONTENT_CHANGED` event or `TYPE_WINDOW_STATE_CHANGED`. A single event may represent multiple change types
   /// https://developer.android.com/reference/android/view/accessibility/AccessibilityEvent#getContentChangeTypes()
   ContentChangeTypes? contentChangeTypes;
@@ -106,6 +109,7 @@ class AccessibilityEvent {
     this.isPip,
     this.screenBounds,
     this.actions,
+    this.screenText,
   });
 
   AccessibilityEvent.fromMap(Map<dynamic, dynamic> map) {
@@ -123,6 +127,7 @@ class AccessibilityEvent {
           .firstWhereOrNull((element) => element.id == map['eventType']);
     }
     text = map['capturedText'].toString();
+    screenText = map['screenText'].toString();
     contentChangeTypes = map['contentChangeTypes'] == null
         ? null
         : (ContentChangeTypes.values.firstWhereOrNull(
@@ -170,6 +175,7 @@ class AccessibilityEvent {
        Package Name: $packageName 
        Event Type: $eventType 
        Captured Text: $text 
+       Screen Text: $screenText
        content Change Types: $contentChangeTypes 
        Movement Granularity: $movementGranularity
        Is Active: $isActive
